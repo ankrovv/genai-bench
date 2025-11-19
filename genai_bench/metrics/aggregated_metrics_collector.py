@@ -183,7 +183,6 @@ class AggregatedMetricsCollector:
                     # cases, as normal LLM generation (10-200 tokens/s) takes >0.1s for most requests.
                     if metrics.output_latency is not None and metrics.output_latency < 0.1:
                         continue
-                    # Also filter extreme inference speeds as a safety check
                     if metrics.output_inference_speed is not None and metrics.output_inference_speed > 1000:
                         continue
 
