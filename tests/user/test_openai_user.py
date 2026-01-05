@@ -9,6 +9,8 @@ from genai_bench.protocol import (
     UserChatResponse,
     UserEmbeddingRequest,
     UserImageChatRequest,
+    UserImageGenerationRequest,
+    UserImageGenerationResponse,
     UserResponse,
 )
 from genai_bench.user.openai_user import OpenAIUser
@@ -837,3 +839,165 @@ def test_ignore_eos_openai_backend_removed(mock_post, mock_openai_user):
     call_args = mock_post.call_args
     payload = call_args.kwargs["json"]
     assert "ignore_eos" not in payload
+
+
+@patch("genai_bench.user.openai_user.requests.post")
+def test_image_generation(mock_post, mock_openai_user):
+    """Test image generation task with url response format."""
+    mock_openai_user.on_start()
+    mock_openai_user.sample = lambda: UserImageGenerationRequest(
+        model="dall-e-3",
+        prompt="A serene mountain landscape",
+        size="1024x1024",
+        quality="standard",
+        num_images=1,
+        additional_request_params={},
+    )
+
+    response_mock = MagicMock()
+    response_mock.status_code = 200
+    response_mock.json.return_value = {
+        "data": [
+            {
+                "url": "https://example.com/image.png",
+                "b64_json": None,
+                "revised_prompt": "A serene mountain landscape with snow-capped peaks",
+            }
+        ]
+    }
+    mock_post.return_value = response_mock
+
+    mock_openai_user.image_generation()
+
+    mock_post.assert_called_once_with(
+        url="http://example.com/v1/images/generations",
+        json={
+            "model": "dall-e-3",
+            "prompt": "A serene mountain landscape",
+            "n": 1,
+            "size": "1024x1024",
+            "quality": "standard",
+            "response_format": "url",
+        },
+        stream=False,
+        headers={
+            "Authorization": "Bearer fake_api_key",
+            "Content-Type": "application/json",
+        },
+    )
+
+
+@patch("genai_bench.user.openai_user.requests.post")
+def test_image_generation_b64_json(mock_post, mock_openai_user):
+    """Test image generation with b64_json response format (SGLang compatibility)."""
+    mock_openai_user.on_start()
+    mock_openai_user.sample = lambda: UserImageGenerationRequest(
+        model="dall-e-3",
+        prompt="A futuristic city",
+        size="1024x1024",
+        quality="standard",
+        num_images=1,
+        additional_request_params={"response_format": "b64_json"},
+    )
+
+    response_mock = MagicMock()
+    response_mock.status_code = 200
+    response_mock.json.return_value = {
+        "data": [{"url": None, "b64_json": "iVBORw0KGgoAAAANSUhEUgAAAAUA"}]
+    }
+    mock_post.return_value = response_mock
+
+    mock_openai_user.image_generation()
+
+    mock_post.assert_called_once_with(
+        url="http://example.com/v1/images/generations",
+        json={
+            "model": "dall-e-3",
+            "prompt": "A futuristic city",
+            "n": 1,
+            "size": "1024x1024",
+            "quality": "standard",
+            "response_format": "b64_json",
+        },
+        stream=False,
+        headers={
+            "Authorization": "Bearer fake_api_key",
+            "Content-Type": "application/json",
+        },
+    )
+
+
+def test_image_generation_with_wrong_request_type(mock_openai_user):
+    """Test that using wrong request type for image generation raises error."""
+    mock_openai_user.on_start()
+    mock_openai_user.sample = lambda: "InvalidRequestType"
+
+    with pytest.raises(
+        AttributeError,
+        match="user_request should be of type UserImageGenerationRequest for "
+        "OpenAIUser.image_generation",
+    ):
+        mock_openai_user.image_generation()
+
+
+@patch("genai_bench.user.openai_user.requests.post")
+def test_send_request_image_generation_response(mock_post, mock_openai_user):
+    """Test parsing of image generation response."""
+    mock_openai_user.on_start()
+
+    # Simulate a 200 image generation response
+    response_mock = MagicMock()
+    response_mock.status_code = 200
+    response_mock.json.return_value = {
+        "data": [
+            {
+                "url": "https://example.com/generated-image.png",
+                "b64_json": None,
+                "revised_prompt": "Enhanced prompt by DALL-E 3",
+            }
+        ]
+    }
+    mock_post.return_value = response_mock
+
+    user_response = mock_openai_user.send_request(
+        stream=False,
+        endpoint="/v1/images/generations",
+        payload={"model": "dall-e-3", "prompt": "test"},
+        parse_strategy=mock_openai_user.parse_image_generation_response,
+    )
+
+    # Assert type is UserImageGenerationResponse
+    assert isinstance(user_response, UserImageGenerationResponse)
+    assert user_response.status_code == 200
+    assert user_response.generated_images == ["https://example.com/generated-image.png"]
+    assert user_response.revised_prompt == "Enhanced prompt by DALL-E 3"
+    assert user_response.tokens_received == 1  # 1 image generated
+    assert user_response.num_prefill_tokens == 0
+    mock_post.assert_called_once()
+
+
+@patch("genai_bench.user.openai_user.requests.post")
+def test_parse_image_generation_response_empty_data(mock_post, mock_openai_user):
+    """Test parsing image generation response when data array is empty."""
+    mock_openai_user.on_start()
+
+    # Simulate response with empty data array
+    response_mock = MagicMock()
+    response_mock.status_code = 200
+    response_mock.json.return_value = {"data": []}
+    mock_post.return_value = response_mock
+
+    user_response = mock_openai_user.send_request(
+        stream=False,
+        endpoint="/v1/images/generations",
+        payload={"model": "dall-e-3", "prompt": "test"},
+        parse_strategy=mock_openai_user.parse_image_generation_response,
+    )
+
+    # Assert handling of empty data
+    assert isinstance(user_response, UserImageGenerationResponse)
+    assert user_response.status_code == 200
+    assert user_response.generated_images == []
+    assert user_response.revised_prompt is None
+    assert user_response.tokens_received == 0
+    mock_post.assert_called_once()
