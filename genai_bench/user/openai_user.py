@@ -446,11 +446,12 @@ class OpenAIUser(BaseUser):
         """
 
         data = response.json()
+        image_data = data.get("data", [])
         generated_images = [
-            img["url"] if "url" in img else img.get("b64_json", "")
-            for img in data.get("data", [])
+            img.get("url") or img.get("b64_json", "")
+            for img in image_data
         ]
-        revised_prompt = data.get("data", [{}])[0].get("revised_prompt")
+        revised_prompt = image_data[0].get("revised_prompt") if image_data else None
 
         return UserImageGenerationResponse(
             status_code=200,
@@ -460,4 +461,5 @@ class OpenAIUser(BaseUser):
             generated_images=generated_images,
             revised_prompt=revised_prompt,
             num_prefill_tokens=0,
+            tokens_received=len(generated_images),
         )

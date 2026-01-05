@@ -197,9 +197,15 @@ class AggregatedMetricsCollector:
 
             # Validate that all values are valid for processing
             if not values:
-                raise ValueError(
-                    f"No values found for metric '{key}'. This should never happen!"
+                # For some metrics (like tpot for non-streaming tasks), all values
+                # may be None. In this case, skip aggregation for this metric.
+                logger.info(
+                    f"No valid values found for metric '{key}'. "
+                    f"This can happen for non-streaming tasks where certain metrics "
+                    f"(e.g., tpot, output_inference_speed) don't apply. Skipping "
+                    f"aggregation for this metric."
                 )
+                continue
 
             percentiles = np.percentile(values, [25, 50, 75, 90, 95, 99])
             stat_field = getattr(self.aggregated_metrics.stats, key)

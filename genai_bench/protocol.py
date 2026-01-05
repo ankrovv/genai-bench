@@ -173,6 +173,10 @@ class UserImageGenerationResponse(UserResponse):
         default=None,
         description="The revised prompt used by the model (e.g., DALL-E 3).",
     )
+    tokens_received: Optional[int] = Field(
+        default=0,
+        description="Number of images generated (used for metrics compatibility).",
+    )
 
 
 class APIAuthConfig(BaseModel):

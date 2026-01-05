@@ -1,6 +1,10 @@
 from genai_bench.logging import init_logger
 from genai_bench.metrics.metrics import RequestLevelMetrics
-from genai_bench.protocol import UserChatResponse, UserResponse
+from genai_bench.protocol import (
+    UserChatResponse,
+    UserImageGenerationResponse,
+    UserResponse,
+)
 
 logger = init_logger(__name__)
 
@@ -53,6 +57,8 @@ class RequestMetricsCollector:
         # Check if the response is a UserChatResponse for output metrics
         if isinstance(response, UserChatResponse):
             self._calculate_output_metrics(response)
+        elif isinstance(response, UserImageGenerationResponse):
+            self._calculate_image_generation_metrics(response)
         else:
             # For non-chat responses, reset output metrics to avoid NoneType
             # Error in AggregatedMetricsCollector
@@ -84,6 +90,32 @@ class RequestMetricsCollector:
                 f"{self.metrics.num_output_tokens} is <= 1. Please check"
                 f" your server and request!"
             )
+
+    def _calculate_image_generation_metrics(
+        self, response: UserImageGenerationResponse
+    ):
+        """
+        Helper function to calculate metrics from a UserImageGenerationResponse.
+
+        For non-streaming image generation tasks:
+        - num_output_tokens represents the number of images generated
+        - output_latency is 0 (entire image arrives at once)
+        - tpot and related speed metrics don't make sense and will be filtered out
+        """
+        assert (
+            response.tokens_received is not None
+        ), "response.tokens_received is None"
+        self.metrics.num_output_tokens = response.tokens_received
+        self.metrics.total_tokens += self.metrics.num_output_tokens
+
+        # For non-streaming image generation, output arrives all at once
+        # so output_latency is 0. The filter_metrics() function will
+        # automatically set tpot and output_inference_speed to None
+        # since output_latency < 0.001s
+        self.metrics.output_latency = 0.0
+        self.metrics.tpot = 0.0
+        self.metrics.output_inference_speed = 0.0
+        self.metrics.output_throughput = 0.0
 
     def _reset_output_metrics(self):
         """Helper function to reset all output-related metrics to 0."""
