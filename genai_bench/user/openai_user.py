@@ -448,8 +448,7 @@ class OpenAIUser(BaseUser):
         data = response.json()
         image_data = data.get("data", [])
         generated_images = [
-            img.get("url") or img.get("b64_json", "")
-            for img in image_data
+            img.get("url") or img.get("b64_json", "") for img in image_data
         ]
         revised_prompt = image_data[0].get("revised_prompt") if image_data else None
 

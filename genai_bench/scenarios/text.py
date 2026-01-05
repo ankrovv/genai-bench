@@ -228,7 +228,7 @@ class ReRankScenario(Scenario):
 class ImageGenerationScenario(Scenario):
     """
     Defines the dimensions (width x height) of images to generate.
-    
+
     Example formats:
         IG(512,512)      # 512x512 square image
         IG(1024,1024)    # 1024x1024 square image (DALL-E 3 default)
