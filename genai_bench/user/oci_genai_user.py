@@ -92,11 +92,13 @@ class OCIGenAIUser(BaseUser):
             return metrics_response
         except Exception as e:
             logger.warning(f"Error: {e}")
-            return UserResponse(
-                status_code=500,
+            metrics_response = UserResponse(
+                status_code=getattr(e, "status", 500),
                 error_message=str(e),
                 num_prefill_tokens=num_prefill_tokens or 0,
             )
+            self.collect_metrics(metrics_response, endpoint)
+            return metrics_response
 
     @task
     def chat(self):
@@ -275,6 +277,22 @@ class OCIGenAIUser(BaseUser):
                                 f"Text: '{text_segment}', "
                                 f"streaming events count: {streaming_events_count}"
                             )
+
+                    reasoning_segment = message.get("reasoningContent", "")
+                    if reasoning_segment:
+                        # Capture the time at the first token
+                        if not time_at_first_token:
+                            time_at_first_token = time.monotonic()
+                            logger.debug(
+                                f"First token received at: {time_at_first_token}"
+                            )
+                        generated_text += reasoning_segment
+                        streaming_events_count += 1  # each event contains one token
+                        logger.debug(
+                            f"Reasoning Text: '{reasoning_segment}', "
+                            f"streaming events count: {streaming_events_count}"
+                        )
+
                     # Track the previous data for debugging purposes
                     previous_data = parsed_data
                 else:

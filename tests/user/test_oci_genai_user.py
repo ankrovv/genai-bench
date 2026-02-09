@@ -116,6 +116,51 @@ def test_chat_grok_format(mock_client_class, test_genai_user):
 
 
 @patch("genai_bench.user.oci_genai_user.GenerativeAiInferenceClient")
+def test_chat_with_reasoning_content(mock_client_class, test_genai_user):
+    """Test chat response includes reasoningContent text."""
+    mock_client_instance = mock_client_class.return_value
+    mock_client_instance.chat.return_value.status = 200
+    reasoning_msg = (
+        '{"message": {"role": "ASSISTANT", ' '"reasoningContent": "Thinking..."}}'
+    )
+    content_msg = (
+        '{"message": {"role": "ASSISTANT", '
+        '"content": [{"type": "TEXT", "text": " Done"}]}}'
+    )
+    usage_msg = (
+        '{"usage": {"totalTokens": 7, "promptTokens": 5, '
+        '"completionTokens": 2, "completionTokensDetails": {"reasoningTokens": 1}}}'
+    )
+
+    mock_client_instance.chat.return_value.data.events.return_value = iter(
+        [
+            MagicMock(data=reasoning_msg),
+            MagicMock(data=content_msg),
+            MagicMock(data='{"finishReason": "stop"}'),
+            MagicMock(data=usage_msg),
+        ]
+    )
+
+    test_genai_user.on_start()
+    test_genai_user.sample = lambda: UserChatRequest(
+        model="xai.grok-3-mini-fast",
+        prompt="Hello",
+        num_prefill_tokens=5,
+        additional_request_params={
+            "compartmentId": "ocid1.compartment.oc1..example",
+            "servingType": "ON_DEMAND",
+        },
+        max_tokens=10,
+    )
+
+    response = test_genai_user.chat()
+
+    assert response.status_code == 200
+    assert response.generated_text == "Thinking... Done"
+    assert response.tokens_received == 2
+
+
+@patch("genai_bench.user.oci_genai_user.GenerativeAiInferenceClient")
 def test_chat_with_system_message(mock_client_class, test_genai_user):
     """Test chat with system message in additional params."""
     mock_client_instance = mock_client_class.return_value
@@ -302,6 +347,35 @@ def test_chat_with_response_error(mock_client_class, test_genai_user):
     assert response.status_code == 401
     assert response.error_message == "Request Failed"
     metrics_collector_mock.assert_called_once()
+
+
+def test_send_request_collects_metrics_on_exception(test_genai_user):
+    """Test that exceptions are caught and metrics are collected."""
+    test_genai_user.client = MagicMock()
+    test_genai_user.client.chat.side_effect = ValueError("Something went wrong")
+
+    metrics_collector_mock = MagicMock()
+    test_genai_user.collect_metrics = metrics_collector_mock
+
+    response = test_genai_user.send_request(
+        endpoint="chat",
+        payload=MagicMock(),
+        parse_strategy=None,
+        num_prefill_tokens=3,
+    )
+
+    # Verify collect_metrics was called with correct parameters
+    metrics_collector_mock.assert_called_once()
+    call_args = metrics_collector_mock.call_args
+    user_response = call_args[0][0]
+    endpoint = call_args[0][1]
+
+    # Verify metrics are properly collected
+    assert user_response.status_code == 500
+    assert response.status_code == 500
+    assert user_response.num_prefill_tokens == 3
+    assert endpoint == "chat"
+    assert "Something went wrong" in user_response.error_message
 
 
 @patch("genai_bench.user.oci_genai_user.GenerativeAiInferenceClient")
