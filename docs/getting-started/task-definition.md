@@ -15,7 +15,7 @@ Here are the currently supported tasks:
 | Task Name             | Description                                                                                 |
 |-----------------------|---------------------------------------------------------------------------------------------|
 | `text-to-text`        | Benchmarks generating text output from text input, such as chat or QA tasks.                |
-| `text-to-image`       | Benchmarks generating images from text prompts via the OpenAI-compatible `/v1/images/generations` endpoint (e.g., DALL-E, GPT Image, or vLLM-Omni models like Qwen-Image). |
+| `text-to-image`       | Benchmarks generating images from text prompts.                                            |
 | `text-to-embeddings`  | Benchmarks generating embeddings from text input, often for semantic search.                |
 | `image-text-to-text`  | Benchmarks generating text from images and text prompts, such as visual question answering. |
 | `image-to-embeddings` | Benchmarks generating embeddings from images, often for image similarity.                   |
