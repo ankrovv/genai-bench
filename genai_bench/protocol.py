@@ -80,6 +80,15 @@ class UserReRankRequest(UserRequest):
     )
 
 
+class UserTTSRequest(UserRequest):
+    """
+    A class to encapsulate the details related to text-to-speech request tasks.
+    """
+
+    input_text: str = Field(..., description="Text to synthesize into speech.")
+    voice: str = Field(default="alloy", description="Voice for speech synthesis.")
+
+
 class UserImageEmbeddingRequest(UserEmbeddingRequest):
     """
     Represents a request that combines image and embedding modalities, used
@@ -144,6 +153,14 @@ class UserResponse(BaseModel):
             "all documents."
         ),
     )
+
+
+class UserTTSResponse(UserResponse):
+    """
+    A class to encapsulate the response details from text-to-speech tasks.
+    """
+
+    pass
 
 
 class UserChatResponse(UserResponse):
