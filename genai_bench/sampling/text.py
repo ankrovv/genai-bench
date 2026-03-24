@@ -198,20 +198,12 @@ class TextSampler(Sampler):
 
         if scenario is not None and not self._is_dataset_mode(scenario):
             self._validate_scenario(scenario)
-            try:
-                # ImageModality.sample() -> ((w, h), num_input_images, ...)
-                # For text-to-image, num_input_images maps to API "n" param.
-                sample_result = scenario.sample()
-                width, height = sample_result[0]
-                size = f"{width}x{height}"
-                num_images = sample_result[1]
-            except (ValueError, TypeError, IndexError) as e:
-                # Fallback to default if scenario parsing fails
-                logger.warning(
-                    f"Failed to sample from scenario {scenario.to_string()}: {e}. "
-                    f"Falling back to default size '{size}' and "
-                    f"num_images '{num_images}'."
-                )
+            # ImageModality.sample() -> ((w, h), num_input_images, ...)
+            # For text-to-image, num_input_images maps to API "n" param.
+            sample_result = scenario.sample()
+            width, height = sample_result[0]
+            size = f"{width}x{height}"
+            num_images = sample_result[1]
 
         prompt = self._sample_text(None)
 
